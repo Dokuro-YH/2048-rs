@@ -1,0 +1,16 @@
+[package]
+name = "rim"
+version = "0.1.0"
+authors = ["Yanhai <shimmly@live.cn>"]
+edition = "2018"
+
+[[bin]]
+name = "2048"
+path = "src/bin/2048.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rand = "0.8"
+lazy_static = "1.4"
+termion = "1.5"
