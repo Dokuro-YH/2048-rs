@@ -53,7 +53,7 @@ impl<S: Storage> Game<S> {
             best,
         };
 
-        if game.count_empty() == 0 {
+        if game.count_empty() == 16 {
             game.spawn_tile();
             game.spawn_tile();
         }
@@ -125,7 +125,7 @@ impl<S: Storage> Game<S> {
 
         for n in 0..4 {
             let idx = 3 - n;
-            let row = (self.board >> (n * 16)) & 0xFFFF;
+            let row = (self.board >> (n * 16)) & crate::ROW_MASK;
 
             grid[idx] = [
                 ((row >> 12) & 0xF) as u8,
