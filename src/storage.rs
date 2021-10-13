@@ -22,6 +22,7 @@ impl Storage for () {
     fn set_best(&mut self, _: u64) {}
 }
 
+#[derive(Debug, Clone)]
 pub struct InMemoryStorage {
     board: u64,
     best: u64,

@@ -1,6 +1,7 @@
 use rand::Rng;
+use std::cmp;
 
-use crate::moves::{self, Direction};
+use crate::moves::{Direction, Moves};
 use crate::storage::Storage;
 
 pub struct Game<S> {
@@ -22,14 +23,14 @@ impl Game<()> {
         game.spawn_tile();
         game.spawn_tile();
 
-        game.score = moves::score(&game.board);
+        game.score = Moves::get_score(&game.board);
         game.best = game.score;
 
         game
     }
 
     pub fn with_board(board: u64) -> Game<()> {
-        let score = moves::score(&board);
+        let score = Moves::get_score(&board);
         let best = score;
         Game {
             board,
@@ -43,8 +44,8 @@ impl Game<()> {
 impl<S: Storage> Game<S> {
     pub fn with(storage: S) -> Game<S> {
         let board = storage.board();
-        let score = moves::score(&board);
         let best = storage.best();
+        let score = Moves::get_score(&board);
 
         let mut game = Game {
             board,
@@ -56,6 +57,9 @@ impl<S: Storage> Game<S> {
         if game.count_empty() == 16 {
             game.spawn_tile();
             game.spawn_tile();
+
+            game.score = Moves::get_score(&game.board);
+            game.best = cmp::max(game.score, game.best);
         }
 
         game
@@ -64,20 +68,17 @@ impl<S: Storage> Game<S> {
     pub fn execute(&mut self, direction: Direction) {
         let board = self.board;
         let result_board = match direction {
-            Direction::Up => moves::up(board),
-            Direction::Down => moves::down(board),
-            Direction::Left => moves::left(board),
-            Direction::Right => moves::right(board),
+            Direction::Up => Moves::up(board),
+            Direction::Down => Moves::down(board),
+            Direction::Left => Moves::left(board),
+            Direction::Right => Moves::right(board),
         };
 
         if board != result_board {
             self.board = result_board;
-            self.score = moves::score(&self.board);
+            self.score = Moves::get_score(&self.board);
+            self.best = cmp::max(self.score, self.best);
             self.spawn_tile();
-        }
-
-        if self.score > self.best {
-            self.best = self.score;
         }
 
         self.storage.set_board(self.board);
@@ -97,19 +98,19 @@ impl<S: Storage> Game<S> {
             return false;
         }
 
-        if moves::up(self.board) != self.board {
+        if Moves::up(self.board) != self.board {
             return false;
         }
 
-        if moves::down(self.board) != self.board {
+        if Moves::down(self.board) != self.board {
             return false;
         }
 
-        if moves::left(self.board) != self.board {
+        if Moves::left(self.board) != self.board {
             return false;
         }
 
-        if moves::left(self.board) != self.board {
+        if Moves::left(self.board) != self.board {
             return false;
         }
 
@@ -131,12 +132,13 @@ impl<S: Storage> Game<S> {
                 ((row >> 12) & 0xF) as u8,
                 ((row >> 8) & 0xF) as u8,
                 ((row >> 4) & 0xF) as u8,
-                ((row >> 0) & 0xF) as u8,
+                (row & 0xF) as u8,
             ];
         }
 
         grid
     }
+
     /// Returns the count of tiles with a value of `0`
     fn count_empty(&self) -> u32 {
         let mut empty = 0;

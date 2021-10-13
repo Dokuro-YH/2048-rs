@@ -3,7 +3,7 @@ use std::{
     io::{self, Write},
 };
 
-use rim::{Direction, Game};
+use rim::{Direction, Game, InMemoryStorage};
 use termion::{clear, cursor, event::Key, input::TermRead, raw::IntoRawMode};
 
 pub fn main() -> Result<(), Box<dyn error::Error>> {
@@ -12,15 +12,15 @@ pub fn main() -> Result<(), Box<dyn error::Error>> {
 
     write!(stdout, "{}{}", clear::All, cursor::Goto(1, 1))?;
 
-    // let storage = InMemoryStorage::new();
-    let mut game = Game::new();
+    let storage = InMemoryStorage::new();
+    let mut game = Game::with(storage.clone());
 
     ui::draw(&game, &mut stdout)?;
 
     for c in stdin.keys() {
         match c.unwrap() {
             Key::Ctrl('c') => break,
-            Key::Ctrl('r') => game = Game::new(),
+            Key::Ctrl('r') => game = Game::with(storage.clone()),
             Key::Left => game.execute(Direction::Left),
             Key::Right => game.execute(Direction::Right),
             Key::Up => game.execute(Direction::Up),
@@ -39,11 +39,11 @@ mod ui {
     use std::io::{Stdout, Write};
     use termion::{color, cursor};
 
-    const CONTROLS: &str = "╔══════════╦══CONTROLS══════════╗\n\r\
-                            ║ ← ↑ → ↓  ║ move tiles         ║\n\r\
-                            ║ ctrl + c ║ quit               ║\n\r\
-                            ║ ctrl + r ║ restart            ║\n\r\
-                            ╚══════════╩════════════════════╝\n\r";
+    const CONTROLS: &str = "╔════════════╦══CONTROLS════════╗\n\r\
+                            ║  ← ↑ → ↓   ║ move tiles       ║\n\r\
+                            ║  ctrl + r  ║ restart          ║\n\r\
+                            ║  ctrl + c  ║ quit             ║\n\r\
+                            ╚════════════╩══════════════════╝\n\r";
 
     const GAME_OVER: &str = "╔═══════════════════════════════╗\n\r\
                              ║                               ║\n\r\

@@ -22,6 +22,76 @@ impl Moves {
     fn column_from(board: u64) -> u64 {
         (board | (board << 12) | (board << 24) | (board << 36)) & crate::COL_MASK
     }
+
+    /// Returns a transposed board where row are transformed into columns and vice versa.
+    fn transpose(board: u64) -> u64 {
+        let a1 = board & 0xF0F0_0F0F_F0F0_0F0F_u64;
+        let a2 = board & 0x0000_F0F0_0000_F0F0_u64;
+        let a3 = board & 0x0F0F_0000_0F0F_0000_u64;
+
+        let a = a1 | (a2 << 12) | (a3 >> 12);
+
+        let b1 = a & 0xFF00_FF00_00FF_00FF_u64;
+        let b2 = a & 0x00FF_00FF_0000_0000_u64;
+        let b3 = a & 0x0000_0000_FF00_FF00_u64;
+
+        b1 | (b2 >> 24) | (b3 << 24)
+    }
+
+    pub fn up(board: u64) -> u64 {
+        let transposed = Self::transpose(board);
+        let mut result = board;
+
+        result ^= MOVES.up[(transposed & crate::ROW_MASK) as usize];
+        result ^= MOVES.up[((transposed >> 16) & crate::ROW_MASK) as usize] << 4;
+        result ^= MOVES.up[((transposed >> 32) & crate::ROW_MASK) as usize] << 8;
+        result ^= MOVES.up[((transposed >> 48) & crate::ROW_MASK) as usize] << 12;
+
+        result
+    }
+
+    pub fn down(board: u64) -> u64 {
+        let transposed = Self::transpose(board);
+        let mut result = board;
+
+        result ^= MOVES.down[(transposed & crate::ROW_MASK) as usize];
+        result ^= MOVES.down[((transposed >> 16) & crate::ROW_MASK) as usize] << 4;
+        result ^= MOVES.down[((transposed >> 32) & crate::ROW_MASK) as usize] << 8;
+        result ^= MOVES.down[((transposed >> 48) & crate::ROW_MASK) as usize] << 12;
+
+        result
+    }
+
+    pub fn left(board: u64) -> u64 {
+        let mut result = board;
+
+        result ^= MOVES.left[(board & crate::ROW_MASK) as usize];
+        result ^= MOVES.left[((board >> 16) & crate::ROW_MASK) as usize] << 16;
+        result ^= MOVES.left[((board >> 32) & crate::ROW_MASK) as usize] << 32;
+        result ^= MOVES.left[((board >> 48) & crate::ROW_MASK) as usize] << 48;
+
+        result
+    }
+
+    pub fn right(board: u64) -> u64 {
+        let mut result = board;
+
+        result ^= MOVES.right[(board & crate::ROW_MASK) as usize];
+        result ^= MOVES.right[((board >> 16) & crate::ROW_MASK) as usize] << 16;
+        result ^= MOVES.right[((board >> 32) & crate::ROW_MASK) as usize] << 32;
+        result ^= MOVES.right[((board >> 48) & crate::ROW_MASK) as usize] << 48;
+
+        result
+    }
+
+    pub fn get_score(board: &u64) -> u64 {
+        let table = &MOVES.scores;
+
+        table[(board & crate::ROW_MASK) as usize]
+            + table[(board >> 16 & crate::ROW_MASK) as usize]
+            + table[(board >> 32 & crate::ROW_MASK) as usize]
+            + table[(board >> 48 & crate::ROW_MASK) as usize]
+    }
 }
 
 lazy_static! {
@@ -101,76 +171,6 @@ lazy_static! {
     };
 }
 
-pub fn score(board: &u64) -> u64 {
-    let table = &MOVES.scores;
-
-    table[(board & crate::ROW_MASK) as usize]
-        + table[(board >> 16 & crate::ROW_MASK) as usize]
-        + table[(board >> 32 & crate::ROW_MASK) as usize]
-        + table[(board >> 48 & crate::ROW_MASK) as usize]
-}
-
-pub fn up(board: u64) -> u64 {
-    let transposed = self::transpose(board);
-    let mut result = board;
-
-    result ^= MOVES.up[(transposed & crate::ROW_MASK) as usize];
-    result ^= MOVES.up[((transposed >> 16) & crate::ROW_MASK) as usize] << 4;
-    result ^= MOVES.up[((transposed >> 32) & crate::ROW_MASK) as usize] << 8;
-    result ^= MOVES.up[((transposed >> 48) & crate::ROW_MASK) as usize] << 12;
-
-    result
-}
-
-pub fn down(board: u64) -> u64 {
-    let transposed = self::transpose(board);
-    let mut result = board;
-
-    result ^= MOVES.down[(transposed & crate::ROW_MASK) as usize];
-    result ^= MOVES.down[((transposed >> 16) & crate::ROW_MASK) as usize] << 4;
-    result ^= MOVES.down[((transposed >> 32) & crate::ROW_MASK) as usize] << 8;
-    result ^= MOVES.down[((transposed >> 48) & crate::ROW_MASK) as usize] << 12;
-
-    result
-}
-
-pub fn left(board: u64) -> u64 {
-    let mut result = board;
-
-    result ^= MOVES.left[(board & crate::ROW_MASK) as usize];
-    result ^= MOVES.left[((board >> 16) & crate::ROW_MASK) as usize] << 16;
-    result ^= MOVES.left[((board >> 32) & crate::ROW_MASK) as usize] << 32;
-    result ^= MOVES.left[((board >> 48) & crate::ROW_MASK) as usize] << 48;
-
-    result
-}
-
-pub fn right(board: u64) -> u64 {
-    let mut result = board;
-
-    result ^= MOVES.right[(board & crate::ROW_MASK) as usize];
-    result ^= MOVES.right[((board >> 16) & crate::ROW_MASK) as usize] << 16;
-    result ^= MOVES.right[((board >> 32) & crate::ROW_MASK) as usize] << 32;
-    result ^= MOVES.right[((board >> 48) & crate::ROW_MASK) as usize] << 48;
-
-    result
-}
-
-/// Returns a transposed board where row are transformed into columns and vice versa.
-fn transpose(board: u64) -> u64 {
-    let a1 = board & 0xF0F0_0F0F_F0F0_0F0F_u64;
-    let a2 = board & 0x0000_F0F0_0000_F0F0_u64;
-    let a3 = board & 0x0F0F_0000_0F0F_0000_u64;
-
-    let a = a1 | (a2 << 12) | (a3 >> 12);
-
-    let b1 = a & 0xFF00_FF00_00FF_00FF_u64;
-    let b2 = a & 0x00FF_00FF_0000_0000_u64;
-    let b3 = a & 0x0000_0000_FF00_FF00_u64;
-
-    b1 | (b2 >> 24) | (b3 << 24)
-}
-
 #[cfg(test)]
 mod test_super {
     use super::*;
@@ -182,7 +182,7 @@ mod test_super {
     #[test]
     fn test_transpose() {
         let board = 0xFEDC_BA98_7654_3210;
-        let result = transpose(board);
+        let result = Moves::transpose(board);
 
         assert_eq!(result, 0xFB73_EA62_D951_C840);
     }
@@ -190,7 +190,7 @@ mod test_super {
     #[test]
     fn test_move_up() {
         let board = 0x1111_0000_0000_1111;
-        let result = up(board);
+        let result = Moves::up(board);
 
         assert_eq!(result, 0x2222_0000_0000_0000);
     }
@@ -198,7 +198,7 @@ mod test_super {
     #[test]
     fn test_move_down() {
         let board = 0x1111_0000_0000_1111;
-        let result = down(board);
+        let result = Moves::down(board);
 
         assert_eq!(result, 0x0000_0000_0000_2222);
     }
@@ -206,7 +206,7 @@ mod test_super {
     #[test]
     fn test_move_left() {
         let board = 0x1001_1001_1001_1001;
-        let result = left(board);
+        let result = Moves::left(board);
 
         assert_eq!(result, 0x2000_2000_2000_2000);
     }
@@ -214,7 +214,7 @@ mod test_super {
     #[test]
     fn test_move_right() {
         let board = 0x1001_1001_1001_1001;
-        let result = right(board);
+        let result = Moves::right(board);
 
         assert_eq!(result, 0x0002_0002_0002_0002);
     }
