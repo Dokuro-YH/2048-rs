@@ -1,159 +1,144 @@
 use rand::Rng;
 
-use crate::moves::MOVES;
-use crate::ROW_MASK;
+use crate::moves::{self, Direction};
+use crate::storage::Storage;
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Direction {
-    Up,
-    Down,
-    Left,
-    Right,
+pub struct Game<S> {
+    board: u64,
+    score: u64,
+    best: u64,
+    storage: S,
 }
 
-pub struct Game {
-    pub board: u64,
-}
-
-impl Game {
-    /// Constructs a new `Game` and spawn tow tile.
-    pub fn new() -> Self {
-        let mut game = Self {
+impl Game<()> {
+    pub fn new() -> Game<()> {
+        let mut game = Game {
             board: 0x0000_0000_0000_0000_u64,
+            storage: (),
+            score: 0,
+            best: 0,
         };
 
-        game.board |= game.spawn_tile();
-        game.board |= game.spawn_tile();
+        game.spawn_tile();
+        game.spawn_tile();
+
+        game.score = moves::score(&game.board);
+        game.best = game.score;
 
         game
     }
 
-    pub fn with(board: u64) -> Self {
-        Game { board }
+    pub fn with_board(board: u64) -> Game<()> {
+        let score = moves::score(&board);
+        let best = score;
+        Game {
+            board,
+            storage: (),
+            score,
+            best,
+        }
+    }
+}
+
+impl<S: Storage> Game<S> {
+    pub fn with(storage: S) -> Game<S> {
+        let board = storage.board();
+        let score = moves::score(&board);
+        let best = storage.best();
+
+        let mut game = Game {
+            board,
+            storage,
+            score,
+            best,
+        };
+
+        if game.count_empty() == 0 {
+            game.spawn_tile();
+            game.spawn_tile();
+        }
+
+        game
     }
 
     pub fn execute(&mut self, direction: Direction) {
         let board = self.board;
         let result_board = match direction {
-            Direction::Up => self.move_up(),
-            Direction::Down => self.move_down(),
-            Direction::Left => self.move_left(),
-            Direction::Right => self.move_right(),
+            Direction::Up => moves::up(board),
+            Direction::Down => moves::down(board),
+            Direction::Left => moves::left(board),
+            Direction::Right => moves::right(board),
         };
 
         if board != result_board {
-            self.board |= self.spawn_tile();
+            self.board = result_board;
+            self.score = moves::score(&self.board);
+            self.spawn_tile();
         }
+
+        if self.score > self.best {
+            self.best = self.score;
+        }
+
+        self.storage.set_board(self.board);
+        self.storage.set_best(self.score);
     }
 
     pub fn score(&self) -> u64 {
-        let table = &MOVES.scores;
-
-        let score = table[((self.board >> 0) & ROW_MASK) as usize]
-            + table[(self.board >> 16 & ROW_MASK) as usize]
-            + table[(self.board >> 32 & ROW_MASK) as usize]
-            + table[(self.board >> 48 & ROW_MASK) as usize];
-
-        score
+        self.score
     }
 
-    pub fn is_complete(&self) -> bool {
-        todo!()
+    pub fn best(&self) -> u64 {
+        self.best
     }
 
-    /// Returns a transposed board where row are transformed into columns and vice versa.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use rim::Game;
-    ///
-    /// let game = Game::with(0xFEDC_BA98_7654_3210);
-    /// let result = game.transpose();
-    ///
-    /// // | F | E | D | C |      | F | B | 7 | 3 |
-    /// // | B | A | 9 | 8 |  =>  | E | A | 6 | 2 |
-    /// // | 7 | 6 | 5 | 4 |      | D | 9 | 5 | 1 |
-    /// // | 3 | 2 | 1 | 0 |      | C | 8 | 4 | 0 |
-    ///
-    /// assert_eq!(result, 0xFB73_EA62_D951_C840);
-    /// ```
-    pub fn transpose(&self) -> u64 {
-        let board = &self.board;
-        let a1 = board & 0xF0F0_0F0F_F0F0_0F0F_u64;
-        let a2 = board & 0x0000_F0F0_0000_F0F0_u64;
-        let a3 = board & 0x0F0F_0000_0F0F_0000_u64;
+    pub fn game_over(&self) -> bool {
+        if self.count_empty() > 0 {
+            return false;
+        }
 
-        let a = a1 | (a2 << 12) | (a3 >> 12);
+        if moves::up(self.board) != self.board {
+            return false;
+        }
 
-        let b1 = a & 0xFF00_FF00_00FF_00FF_u64;
-        let b2 = a & 0x00FF_00FF_0000_0000_u64;
-        let b3 = a & 0x0000_0000_FF00_FF00_u64;
+        if moves::down(self.board) != self.board {
+            return false;
+        }
 
-        b1 | (b2 >> 24) | (b3 << 24)
+        if moves::left(self.board) != self.board {
+            return false;
+        }
+
+        if moves::left(self.board) != self.board {
+            return false;
+        }
+
+        true
     }
 
-    pub fn move_up(&self) -> u64 {
-        let transposed = self.transpose();
-        let mut result = self.board;
-
-        result ^= MOVES.up[((transposed >> 0) & ROW_MASK) as usize] << 0;
-        result ^= MOVES.up[((transposed >> 16) & ROW_MASK) as usize] << 4;
-        result ^= MOVES.up[((transposed >> 32) & ROW_MASK) as usize] << 8;
-        result ^= MOVES.up[((transposed >> 48) & ROW_MASK) as usize] << 12;
-
-        result
+    pub fn board(&self) -> u64 {
+        self.board
     }
 
-    pub fn move_down(&self) -> u64 {
-        let transposed = self.transpose();
-        let mut result = self.board;
+    pub fn grid(&self) -> [[u8; 4]; 4] {
+        let mut grid: [[u8; 4]; 4] = [[0; 4]; 4];
 
-        result ^= MOVES.down[((transposed >> 0) & ROW_MASK) as usize] << 0;
-        result ^= MOVES.down[((transposed >> 16) & ROW_MASK) as usize] << 4;
-        result ^= MOVES.down[((transposed >> 32) & ROW_MASK) as usize] << 8;
-        result ^= MOVES.down[((transposed >> 48) & ROW_MASK) as usize] << 12;
+        for n in 0..4 {
+            let idx = 3 - n;
+            let row = (self.board >> (n * 16)) & 0xFFFF;
 
-        result
+            grid[idx] = [
+                ((row >> 12) & 0xF) as u8,
+                ((row >> 8) & 0xF) as u8,
+                ((row >> 4) & 0xF) as u8,
+                ((row >> 0) & 0xF) as u8,
+            ];
+        }
+
+        grid
     }
-
-    pub fn move_left(&self) -> u64 {
-        let board = &self.board;
-        let mut result = self.board;
-
-        result ^= MOVES.left[((board >> 0) & ROW_MASK) as usize] << 0;
-        result ^= MOVES.left[((board >> 16) & ROW_MASK) as usize] << 16;
-        result ^= MOVES.left[((board >> 32) & ROW_MASK) as usize] << 32;
-        result ^= MOVES.left[((board >> 48) & ROW_MASK) as usize] << 48;
-
-        result
-    }
-
-    pub fn move_right(&self) -> u64 {
-        let board = &self.board;
-        let mut result = self.board;
-
-        result ^= MOVES.right[((board >> 0) & ROW_MASK) as usize] << 0;
-        result ^= MOVES.right[((board >> 16) & ROW_MASK) as usize] << 16;
-        result ^= MOVES.right[((board >> 32) & ROW_MASK) as usize] << 32;
-        result ^= MOVES.right[((board >> 48) & ROW_MASK) as usize] << 48;
-
-        result
-    }
-
     /// Returns the count of tiles with a value of `0`
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use rim::Game;
-    ///
-    /// let game = Game::with(0x0100_0020_0001_0001);
-    /// let result = game.count_empty();
-    ///
-    /// assert_eq!(12, result);
-    /// ```
-    pub fn count_empty(&self) -> u32 {
+    fn count_empty(&self) -> u32 {
         let mut empty = 0;
 
         for i in 0..16 {
@@ -165,20 +150,11 @@ impl Game {
         empty
     }
 
-    /// Returns `1` with 90% chance and `2` with 10% chance.
-    pub fn random_tile() -> u64 {
-        if 10 == rand::thread_rng().gen_range(0..10) {
-            2
-        } else {
-            1
-        }
-    }
-
     /// Returns a `board` that randomly generates `1` or `2` at any `0` position.
-    pub fn spawn_tile(&self) -> u64 {
+    fn spawn_tile(&mut self) {
         let mut tmp = self.board;
         let mut idx = rand::thread_rng().gen_range(0..self.count_empty());
-        let mut t = Self::random_tile();
+        let mut t = self::random_tile();
 
         loop {
             while (tmp & 0xF) != 0 {
@@ -196,12 +172,49 @@ impl Game {
             t <<= 4;
         }
 
-        t
+        self.board |= t
     }
 }
 
-impl Default for Game {
+impl Default for Game<()> {
     fn default() -> Self {
-        Self::new()
+        Game::new()
+    }
+}
+
+/// Returns `1` with 60% chance and `2` with 40% chance.
+fn random_tile() -> u64 {
+    if rand::thread_rng().gen_range(0..10) < 4 {
+        2
+    } else {
+        1
+    }
+}
+
+#[cfg(test)]
+mod test_super {
+    use super::*;
+
+    #[test]
+    fn test_count_empty() {
+        let game = Game::with_board(0x0100_0020_0001_0001);
+        let result = game.count_empty();
+
+        assert_eq!(12, result);
+    }
+
+    #[test]
+    fn test_grid() {
+        let game = Game::with_board(0xFEDC_BA98_7654_3210);
+        assert_eq!(
+            game.grid(),
+            [[15, 14, 13, 12], [11, 10, 9, 8], [7, 6, 5, 4], [3, 2, 1, 0]]
+        );
+
+        let game = Game::with_board(0x0123_4567_89AB_CDEF);
+        assert_eq!(
+            game.grid(),
+            [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]
+        );
     }
 }

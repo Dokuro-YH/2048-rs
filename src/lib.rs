@@ -8,5 +8,8 @@ pub static COL_MASK: u64 = 0x000F_000F_000F_000F_u64;
 
 mod game;
 mod moves;
+mod storage;
 
-pub use game::{Game, Direction};
+pub use game::Game;
+pub use moves::Direction;
+pub use storage::{InMemoryStorage, Storage};
