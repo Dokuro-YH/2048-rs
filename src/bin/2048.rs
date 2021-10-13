@@ -149,8 +149,7 @@ mod ui {
         match val {
             0 => 0,
             1 => 2,
-            2 => 4,
-            x => 2_u64.pow((x + 1) as u32),
+            x => 2_u64.pow(x as u32),
         }
     }
 
