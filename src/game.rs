@@ -1,66 +1,39 @@
 use rand::Rng;
-use std::cmp;
 
 use crate::moves::{Direction, Moves};
-use crate::storage::Storage;
 
-pub struct Game<S> {
+pub struct Game {
     board: u64,
     score: u64,
-    best: u64,
-    storage: S,
 }
 
-impl Game<()> {
-    pub fn new() -> Game<()> {
+impl Game {
+    fn init(&mut self) {
+        if self.count_empty() == 16 {
+            self.spawn_tile();
+            self.spawn_tile();
+        }
+        self.score = Moves::get_score(&self.board);
+    }
+
+    pub fn new() -> Game {
         let mut game = Game {
             board: 0x0000_0000_0000_0000_u64,
-            storage: (),
-            score: 0,
-            best: 0,
+            score: 0
         };
 
-        game.spawn_tile();
-        game.spawn_tile();
-
-        game.score = Moves::get_score(&game.board);
-        game.best = game.score;
+        game.init();
 
         game
     }
 
-    pub fn with_board(board: u64) -> Game<()> {
-        let score = Moves::get_score(&board);
-        let best = score;
-        Game {
-            board,
-            storage: (),
-            score,
-            best,
-        }
-    }
-}
-
-impl<S: Storage> Game<S> {
-    pub fn with(storage: S) -> Game<S> {
-        let board = storage.board();
-        let best = storage.best();
-        let score = Moves::get_score(&board);
-
+    pub fn with_board(board: u64) -> Game {
         let mut game = Game {
             board,
-            storage,
-            score,
-            best,
+            score: 0
         };
 
-        if game.count_empty() == 16 {
-            game.spawn_tile();
-            game.spawn_tile();
-
-            game.score = Moves::get_score(&game.board);
-            game.best = cmp::max(game.score, game.best);
-        }
+        game.init();
 
         game
     }
@@ -77,20 +50,18 @@ impl<S: Storage> Game<S> {
         if board != result_board {
             self.board = result_board;
             self.score = Moves::get_score(&self.board);
-            self.best = cmp::max(self.score, self.best);
             self.spawn_tile();
         }
+    }
 
-        self.storage.set_board(self.board);
-        self.storage.set_best(self.score);
+    pub fn restart(&mut self) {
+        self.board = 0x0000_0000_0000_0000_u64;
+
+        self.init();
     }
 
     pub fn score(&self) -> u64 {
         self.score
-    }
-
-    pub fn best(&self) -> u64 {
-        self.best
     }
 
     pub fn game_over(&self) -> bool {
@@ -178,7 +149,7 @@ impl<S: Storage> Game<S> {
     }
 }
 
-impl Default for Game<()> {
+impl Default for Game {
     fn default() -> Self {
         Game::new()
     }

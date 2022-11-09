@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Direction {
     Up,
     Down,
